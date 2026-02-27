@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Blunder Predictor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ====== Navbar ====== -->
+    <nav class="navbar">
+        <div class="logo">
+            <span>&#9822;</span> Chess Analysis Tools
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">Opening Recommender</a></li>
+            <li><a href="blunder.html" class="active">Blunder Predictor</a></li>
+            <li><a href="elo.html">ELO Calculator</a></li>
+        </ul>
+    </nav>
+
+    <!-- ====== Main ====== -->
+    <div class="container">
+        <h1 class="page-title">Blunder Predictor</h1>
+        <p class="page-subtitle">Analyze a PGN game for potential blunders using our XGBoost ML model.</p>
+
+        <!-- ============ PGN Game Analysis ============ -->
+        <div class="card">
+            <div class="card-title">&#9814; Paste a PGN Game</div>
+            <form id="pgn-form" novalidate>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="pgn_text">PGN Text</label>
+                        <textarea id="pgn_text" rows="10" placeholder='[Event "Rated Blitz"]&#10;[White "Player1"]&#10;[Black "Player2"]&#10;[WhiteElo "1500"]&#10;[BlackElo "1400"]&#10;[TimeControl "180+0"]&#10;&#10;1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 ...' required></textarea>
+                        <span class="field-error" id="err-pgn_text"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="pgn_white_elo">White ELO (override, optional)</label>
+                        <input type="number" id="pgn_white_elo" placeholder="From PGN header">
+                    </div>
+                    <div class="form-group">
+                        <label for="pgn_black_elo">Black ELO (override, optional)</label>
+                        <input type="number" id="pgn_black_elo" placeholder="From PGN header">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-primary" id="btn-pgn">
+                        Analyze Game
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-pgn-reset">Reset</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- PGN Result -->
+        <div id="pgn-result" class="result-panel">
+            <div id="pgn-hero" class="result-hero neutral">
+                <div class="big-number" id="pgn-blunder-count">—</div>
+                <div class="verdict" id="pgn-verdict">—</div>
+            </div>
+            <div class="result-detail" id="pgn-detail" style="margin-bottom: 1rem;"></div>
+            <div class="move-table-wrap">
+                <table class="move-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Move</th>
+                            <th>Side</th>
+                            <th>Eval Before</th>
+                            <th>Eval After</th>
+                            <th>CP Loss</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pgn-moves-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="pgn-error" class="alert alert-error" style="display:none;"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

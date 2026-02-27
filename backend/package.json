@@ -1,0 +1,5 @@
+{
+    "name": "blunder-chess-backend",
+    "version": "1.0.0",
+    "description": "Flask API for chess blunder prediction and ELO calculation"
+}

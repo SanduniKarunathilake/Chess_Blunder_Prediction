@@ -1,0 +1,2 @@
+# This directory stores trained model artefacts.
+# blunder_model.pkl is generated after running the training pipeline.

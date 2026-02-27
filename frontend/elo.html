@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELO Calculator — Chess Analysis Tools</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ====== Navbar ====== -->
+    <nav class="navbar">
+        <div class="logo">
+            <span>&#9822;</span> Chess Analysis Tools
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">Opening Recommender</a></li>
+            <li><a href="blunder.html">Blunder Predictor</a></li>
+            <li><a href="elo.html" class="active">ELO Calculator</a></li>
+        </ul>
+    </nav>
+
+    <!-- ====== Main ====== -->
+    <div class="container">
+        <h1 class="page-title">ELO Rating Calculator</h1>
+        <p class="page-subtitle">See how your rating changes after a game — uses the standard FIDE ELO formula.</p>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="elo-single">Single Game</button>
+            <button class="tab-btn" data-tab="elo-session">Multi-Game Session</button>
+        </div>
+
+        <!-- ============ TAB 1: Single ELO ============ -->
+        <div id="tab-elo-single" class="tab-content active">
+            <div class="card">
+                <div class="card-title">&#9812; Game Details</div>
+                <form id="elo-form" novalidate>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="your_rating">Your Rating</label>
+                            <input type="number" id="your_rating" placeholder="e.g. 1500" min="100" max="3500" required>
+                            <span class="field-error" id="err-your_rating"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="opponent_rating">Opponent Rating</label>
+                            <input type="number" id="opponent_rating" placeholder="e.g. 1600" min="100" max="3500" required>
+                            <span class="field-error" id="err-opponent_rating"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="outcome">Game Outcome</label>
+                            <select id="outcome" required>
+                                <option value="" disabled selected>Choose result…</option>
+                                <option value="win">Win</option>
+                                <option value="draw">Draw</option>
+                                <option value="loss">Loss</option>
+                            </select>
+                            <span class="field-error" id="err-outcome"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="games_played">Games Played (total)</label>
+                            <input type="number" id="games_played" placeholder="30 (default)" min="0" max="100000" value="30">
+                            <span class="hint">Under 30 = provisional (K=40).</span>
+                            <span class="field-error" id="err-games_played"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="player_age">Your Age <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+                            <input type="number" id="player_age" placeholder="e.g. 17" min="5" max="120">
+                            <span class="hint">Under 18 always gets K=40 regardless of games played.</span>
+                            <span class="field-error" id="err-player_age"></span>
+                        </div>
+                    </div>
+                    <div class="btn-row">
+                        <button type="submit" class="btn btn-primary" id="btn-elo">
+                            Calculate
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-elo-reset">Reset</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Result -->
+            <div id="elo-result" class="result-panel">
+                <div id="elo-change-bar" class="rating-change">
+                    <div class="arrow" id="elo-arrow">—</div>
+                    <div class="rc-detail">
+                        <div class="rc-old" id="elo-old">—</div>
+                        <div class="rc-new" id="elo-new">—</div>
+                    </div>
+                    <div class="rc-delta" id="elo-delta">—</div>
+                </div>
+                <div class="result-detail" id="elo-detail"></div>
+            </div>
+
+            <!-- Error -->
+            <div id="elo-error" class="alert alert-error" style="display:none;"></div>
+        </div>
+
+        <!-- ============ TAB 2: Multi-Game Session ============ -->
+        <div id="tab-elo-session" class="tab-content">
+            <div class="card">
+                <div class="card-title">&#9813; Session — Multiple Games</div>
+
+                <div class="form-grid" style="margin-bottom: 1.25rem;">
+                    <div class="form-group">
+                        <label for="session_rating">Your Starting Rating</label>
+                        <input type="number" id="session_rating" placeholder="e.g. 1500" min="100" max="3500" required>
+                        <span class="field-error" id="err-session_rating"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="session_games_played">Games Played Before Session</label>
+                        <input type="number" id="session_games_played" placeholder="30" value="30" min="0" max="100000">
+                    </div>
+                    <div class="form-group">
+                        <label for="session_age">Your Age <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+                        <input type="number" id="session_age" placeholder="e.g. 17" min="5" max="120">
+                        <span class="hint">Under 18 always gets K=40.</span>
+                    </div>
+                </div>
+
+                <div class="card-title" style="font-size:.95rem;">Add Games</div>
+
+                <div class="add-game-row">
+                    <div class="form-group">
+                        <label for="sg_opp_name">Opponent Name</label>
+                        <input type="text" id="sg_opp_name" placeholder="(optional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="sg_opp_rating">Opponent Rating</label>
+                        <input type="number" id="sg_opp_rating" placeholder="e.g. 1600" min="100" max="3500">
+                    </div>
+                    <div class="form-group">
+                        <label for="sg_outcome">Result</label>
+                        <select id="sg_outcome">
+                            <option value="win">Win</option>
+                            <option value="draw">Draw</option>
+                            <option value="loss">Loss</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="btn-add-game" style="height:38px;">+ Add</button>
+                </div>
+
+                <div class="games-list" id="session-games-list">
+                    <!-- game chips appear here -->
+                </div>
+
+                <div class="btn-row">
+                    <button type="button" class="btn btn-primary" id="btn-session">
+                        Calculate Session
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-session-reset">Clear All</button>
+                </div>
+            </div>
+
+            <!-- Session Result -->
+            <div id="session-result" class="result-panel">
+                <div id="session-hero" class="result-hero neutral">
+                    <div class="big-number" id="session-final">—</div>
+                    <div class="verdict" id="session-verdict">—</div>
+                </div>
+                <div class="result-detail" id="session-summary" style="margin-bottom:1rem;"></div>
+                <div id="session-games-detail"></div>
+            </div>
+
+            <!-- Error -->
+            <div id="session-error" class="alert alert-error" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

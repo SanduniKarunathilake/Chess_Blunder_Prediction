@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Analysis Tools</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ====== Navbar ====== -->
+    <nav class="navbar">
+        <div class="logo">
+            <span>&#9822;</span> Chess Analysis Tools
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html" class="active">Opening Recommender</a></li>
+            <li><a href="blunder.html">Blunder Predictor</a></li>
+            <li><a href="elo.html">ELO Calculator</a></li>
+        </ul>
+    </nav>
+
+    <!-- ====== Main ====== -->
+    <div class="container">
+        <h1 class="page-title">Opening Recommender</h1>
+        <p class="page-subtitle">Find the best chess openings for your rating, color, and time control using our XGBoost ML model.</p>
+
+        <!-- ============ Opening Recommender ============ -->
+        <div class="card">
+            <div class="card-title">&#9812; Match Details</div>
+            <form id="opening-form" novalidate>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="your_elo">Your ELO Rating</label>
+                        <input type="number" id="your_elo" placeholder="e.g. 1500" min="100" max="3500" required>
+                        <span class="field-error" id="err-your_elo"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="opponent_elo">Opponent ELO Rating</label>
+                        <input type="number" id="opponent_elo" placeholder="e.g. 1400" min="100" max="3500" required>
+                        <span class="field-error" id="err-opponent_elo"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="play_color">Playing Color</label>
+                        <select id="play_color" required>
+                            <option value="white" selected>White</option>
+                            <option value="black">Black</option>
+                        </select>
+                        <span class="field-error" id="err-play_color"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="open_base_time">Base Time (seconds)</label>
+                        <input type="number" id="open_base_time" placeholder="e.g. 600 = 10 min" min="0" max="10800" required>
+                        <span class="hint">60 = 1 min, 180 = 3 min, 600 = 10 min, 900 = 15 min</span>
+                        <span class="field-error" id="err-open_base_time"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="open_increment">Increment (seconds)</label>
+                        <input type="number" id="open_increment" placeholder="e.g. 0 or 2" min="0" max="300" value="0">
+                        <span class="hint">Time added per move. 0 for no increment.</span>
+                        <span class="field-error" id="err-open_increment"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="top_n">Show Top N Openings</label>
+                        <select id="top_n">
+                            <option value="10" selected>Top 10</option>
+                            <option value="20">Top 20</option>
+                            <option value="50">Top 50</option>
+                            <option value="0">All</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-primary" id="btn-opening">
+                        Recommend Openings
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-opening-reset">Reset</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Opening Result -->
+        <div id="opening-result" class="result-panel">
+            <div id="opening-hero" class="result-hero neutral">
+                <div class="big-number" id="opening-best-prob">—</div>
+                <div class="verdict" id="opening-verdict">—</div>
+            </div>
+            <div class="result-detail" id="opening-detail" style="margin-bottom: 1rem;"></div>
+            <div class="move-table-wrap">
+                <table class="move-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>ECO</th>
+                            <th>Opening</th>
+                            <th>Win Prob.</th>
+                            <th>Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody id="opening-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="opening-error" class="alert alert-error" style="display:none;"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

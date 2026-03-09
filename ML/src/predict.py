@@ -36,6 +36,7 @@ DEFAULT_ENGINE_PATH = os.path.join(
 )
 
 BLUNDER_THRESHOLD = 300   # centipawns
+MATE_PROXIMITY    = 5_000 # abs(eval) above this = already in near-forced-mate territory
 
 FEATURE_COLUMNS = [
     "white_elo",
@@ -155,9 +156,19 @@ def predict_game(
 
             # Centipawn loss for the mover (from their perspective)
             if white_moved:
-                cp_loss = eval_before_w - eval_after_w
+                raw_cp_loss = eval_before_w - eval_after_w
             else:
-                cp_loss = eval_after_w - eval_before_w
+                raw_cp_loss = eval_after_w - eval_before_w
+
+            # When the pre-move eval is already in a near-forced-mate zone the
+            # engine can "lose sight" of the mate on the very next ply and produce
+            # an artificially large cp_loss on an otherwise fine move.
+            # Cap the loss so depth-inconsistency artifacts are not flagged.
+            near_mate = abs(eval_before_w) >= MATE_PROXIMITY
+            if near_mate:
+                cp_loss = min(max(raw_cp_loss, 0), BLUNDER_THRESHOLD - 1)
+            else:
+                cp_loss = max(raw_cp_loss, 0)
 
             is_blunder = cp_loss >= BLUNDER_THRESHOLD
 
@@ -183,8 +194,9 @@ def predict_game(
                 "Side":         side,
                 "Eval_Before":  eval_before_w,
                 "Eval_After":   eval_after_w,
-                "CP_Loss":      max(cp_loss, 0),
+                "CP_Loss":      cp_loss,
                 "Is_Blunder":   is_blunder,
+                "Near_Mate":    near_mate,
                 "ML_Risk":      round(ml_risk, 4),
             })
 
@@ -195,3 +207,41 @@ def predict_game(
         engine.quit()
 
     return pd.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
+# Single-position blunder risk prediction (no engine required)
+# ---------------------------------------------------------------------------
+
+def predict_position(
+    sample_dict: dict,
+    model_path: str = DEFAULT_MODEL_PATH,
+) -> float:
+    """
+    Predict blunder probability for a single board position using the ML model.
+
+    Parameters
+    ----------
+    sample_dict : dict
+        Feature values for the position.  Required keys (from FEATURE_COLUMNS):
+            white_elo, black_elo, material_diff, total_pieces, in_check,
+            rating_diff, avg_rating, base_time, eval_before, move_number,
+            game_phase
+        Optional / ignored keys (e.g. ``depth``) are silently skipped.
+        Missing required features default to 0.
+
+    model_path : str
+        Path to the saved model pickle.
+
+    Returns
+    -------
+    float
+        Probability in [0, 1] that the next move will be a blunder.
+    """
+    model = joblib.load(model_path)
+
+    # Build a row with all required features, defaulting missing ones to 0
+    row = {col: sample_dict.get(col, 0) for col in FEATURE_COLUMNS}
+    sample = pd.DataFrame([row])
+
+    return float(model.predict_proba(sample[FEATURE_COLUMNS])[0][1])

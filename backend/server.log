@@ -1,0 +1,10 @@
+[OK] Blunder model loaded from E:\ML\Blunder_chess\backend\model\blunder_model.pkl
+[OK] Stockfish found at E:\ML\Blunder_chess\backend\engine\stockfish\stockfish-windows-x86-64-avx2.exe
+[OK] Opening model loaded from E:\ML\Blunder_chess\backend\model\chess_opening_model.pkl
+     206 ECO codes available
+ * Serving Flask app 'app'
+ * Debug mode: on
+[OK] Blunder model loaded from E:\ML\Blunder_chess\backend\model\blunder_model.pkl
+[OK] Stockfish found at E:\ML\Blunder_chess\backend\engine\stockfish\stockfish-windows-x86-64-avx2.exe
+[OK] Opening model loaded from E:\ML\Blunder_chess\backend\model\chess_opening_model.pkl
+     206 ECO codes available

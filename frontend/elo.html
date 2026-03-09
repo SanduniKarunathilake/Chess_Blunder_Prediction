@@ -59,13 +59,13 @@
                         <div class="form-group">
                             <label for="games_played">Games Played (total)</label>
                             <input type="number" id="games_played" placeholder="30 (default)" min="0" max="100000" value="30">
-                            <span class="hint">Under 30 = provisional (K=40).</span>
+                            <span class="hint">Under 30 games = K=40.</span>
                             <span class="field-error" id="err-games_played"></span>
                         </div>
                         <div class="form-group">
-                            <label for="player_age">Your Age <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
-                            <input type="number" id="player_age" placeholder="e.g. 17" min="5" max="120">
-                            <span class="hint">Under 18 always gets K=40 regardless of games played.</span>
+                            <label for="player_age">Your Age <span style="font-weight:400;opacity:.7;">(optional)</span></label>
+                            <input type="number" id="player_age" placeholder="e.g. 16" min="5" max="120">
+                            <span class="hint">Under 18 always uses K=40. Leave blank if unknown.</span>
                             <span class="field-error" id="err-player_age"></span>
                         </div>
                     </div>
@@ -111,9 +111,9 @@
                         <input type="number" id="session_games_played" placeholder="30" value="30" min="0" max="100000">
                     </div>
                     <div class="form-group">
-                        <label for="session_age">Your Age <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
-                        <input type="number" id="session_age" placeholder="e.g. 17" min="5" max="120">
-                        <span class="hint">Under 18 always gets K=40.</span>
+                        <label for="session_age">Your Age <span style="font-weight:400;opacity:.7;">(optional)</span></label>
+                        <input type="number" id="session_age" placeholder="e.g. 16" min="5" max="120">
+                        <span class="hint">Under 18 forces K=40 for all games in session.</span>
                     </div>
                 </div>
 

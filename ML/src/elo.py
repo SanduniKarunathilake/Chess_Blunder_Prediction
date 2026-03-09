@@ -23,7 +23,7 @@ Where:
 
 K-factor rules (FIDE standard)
 -------------------------------
-    K = 40  → age < 18  OR  games_played < 30
+    K = 40  → new / young player  (age < 18  OR  games_played < 30)
     K = 20  → rating < 2400
     K = 10  → rating >= 2400 (elite)
 
@@ -35,10 +35,10 @@ Outcomes accepted
 
 Functions
 ---------
-get_k_factor(rating, games_played, age)  → int
-expected_score(rating_a, rating_b)       → float
-rating_change(rating, opponent_rating, outcome, games_played, age) → dict
-simulate_session(player_rating, opponents, games_played, age)      → dict
+get_k_factor(rating, games_played)  → int
+expected_score(rating_a, rating_b)  → float
+rating_change(rating, opponent_rating, outcome, games_played) → dict
+simulate_session(player_rating, opponents, games_played) → dict
 """
 
 from __future__ import annotations
@@ -58,18 +58,19 @@ def get_k_factor(rating: float, games_played: int, age: int | None = None) -> in
     games_played : int
         Total number of rated games played so far.
     age : int or None
-        Player's age in years. If None, the age condition is not applied.
+        Player's age. If under 18, K=40 regardless of games played.
+        Pass None to skip the age check.
 
     Returns
     -------
     int
         K-factor:
-            40  — age < 18 OR games_played < 30 (junior / provisional)
-            20  — rating < 2400  (standard)
-            10  — rating >= 2400 (elite)
+          40 — new/young player  (age < 18  OR  games_played < 30)
+          20 — regular player    (rating < 2400)
+          10 — elite player      (rating >= 2400)
     """
     if games_played < 30 or (age is not None and age < 18):
-        return 40   # junior or provisional player
+        return 40   # new or young player
     if rating < 2400:
         return 20   # regular player
     return 10       # elite (2400+)
@@ -137,25 +138,23 @@ def rating_change(
         Number of rated games you have played so far (affects K-factor).
         Default 30 (standard K=20).
     age : int or None
-        Player's age in years. If None, age condition is not applied.
-        Players under 18 always receive K=40 regardless of games played.
+        Player's age. Under 18 forces K=40.
 
     Returns
     -------
     dict with keys:
-        old_rating        : float       — rating before the game
-        new_rating        : float       — rating after the game
-        change            : float       — points gained (+) or lost (−)
-        expected_score    : float       — probability of winning (0–1)
-        actual_score      : float       — 1.0 / 0.5 / 0.0
-        k_factor          : int         — K used (10 / 20 / 40)
-        k_reason          : str         — why that K was chosen
-        win_probability   : str         — human-readable win chance (e.g. "63.2%")
-        outcome           : str         — 'win' / 'draw' / 'loss'
+        old_rating        : float  — rating before the game
+        new_rating        : float  — rating after the game
+        change            : float  — points gained (+) or lost (−)
+        expected_score    : float  — probability of winning (0–1)
+        actual_score      : float  — 1.0 / 0.5 / 0.0
+        k_factor          : int    — K used
+        k_factor_reason   : str    — why this K was chosen
+        win_probability   : str    — human-readable win chance (e.g. "63.2%")
+        outcome           : str    — 'win' / 'draw' / 'loss'
         opponent_rating   : float
-        rating_diff       : float       — opponent_rating − your_rating (+ = underdog)
-        age               : int | None  — player age supplied
-        games_played      : int         — games played before this game
+        rating_diff       : float  — opponent_rating − your_rating (+ = underdog)
+        age               : int or None
     """
     k      = get_k_factor(rating, games_played, age)
     e      = expected_score(rating, opponent_rating)
@@ -163,16 +162,12 @@ def rating_change(
     delta  = round(k * (s - e), 1)
     new_r  = round(rating + delta, 1)
 
-    # Build a human-readable reason for the K chosen
     if k == 40:
-        if age is not None and age < 18:
-            k_reason = f"junior (age {age} < 18)"
-        else:
-            k_reason = f"provisional (games {games_played} < 30)"
+        reason = "Young player (age < 18)" if (age is not None and age < 18) else "New player (< 30 games)"
     elif k == 20:
-        k_reason = f"standard (rating {rating} < 2400)"
+        reason = "Standard player (rating < 2400)"
     else:
-        k_reason = f"elite (rating {rating} >= 2400)"
+        reason = "Elite player (rating ≥ 2400)"
 
     return {
         "old_rating":      rating,
@@ -181,13 +176,12 @@ def rating_change(
         "expected_score":  round(e, 4),
         "actual_score":    s,
         "k_factor":        k,
-        "k_reason":        k_reason,
+        "k_factor_reason": reason,
         "win_probability": f"{e * 100:.1f}%",
         "outcome":         outcome.lower(),
         "opponent_rating": opponent_rating,
         "rating_diff":     round(opponent_rating - rating, 1),
         "age":             age,
-        "games_played":    games_played,
     }
 
 
@@ -217,7 +211,7 @@ def simulate_session(
     games_played : int
         Rated games played *before* this session (affects K-factor).
     age : int or None
-        Player's age in years.  Under-18 players always receive K=40.
+        Player's age. Under 18 forces K=40 throughout the session.
 
     Returns
     -------
@@ -225,8 +219,7 @@ def simulate_session(
         starting_rating  : float
         final_rating     : float
         total_change     : float
-        age              : int | None
-        games            : list[dict]   — per-game breakdown (includes k_reason)
+        games            : list[dict]   — per-game breakdown
         summary          : dict         — wins / draws / losses / net
         rating_history   : list[float]  — rating after each game (includes start)
 
@@ -234,7 +227,6 @@ def simulate_session(
     -------
     >>> result = simulate_session(
     ...     player_rating=1500,
-    ...     age=17,
     ...     opponents=[
     ...         {"opponent_rating": 1600, "outcome": "win",  "opponent_name": "Alice"},
     ...         {"opponent_rating": 1450, "outcome": "loss", "opponent_name": "Bob"},
@@ -274,7 +266,6 @@ def simulate_session(
         "starting_rating": player_rating,
         "final_rating":    current_rating,
         "total_change":    round(current_rating - player_rating, 1),
-        "age":             age,
         "games":           game_records,
         "summary": {
             "wins":   wins,
@@ -295,7 +286,6 @@ def games_to_target(
     target_rating: float,
     opponent_rating: float,
     games_played: int = 30,
-    age: int | None = None,
 ) -> dict:
     """
     Estimate how many consecutive wins are needed to reach a target rating,
@@ -307,21 +297,17 @@ def games_to_target(
     target_rating   : float
     opponent_rating : float
     games_played    : int
-    age             : int or None
-        Player's age. Under-18 players always use K=40.
 
     Returns
     -------
     dict with keys:
-        games_needed   : int
-        final_rating   : float
+        games_needed : int
         rating_per_win : float  — average gain per win
-        age            : int | None
     """
     r     = current_rating
     count = 0
     while r < target_rating and count < 10_000:
-        res = rating_change(r, opponent_rating, "win", games_played + count, age)
+        res = rating_change(r, opponent_rating, "win", games_played + count)
         r   = res["new_rating"]
         count += 1
 
@@ -329,5 +315,4 @@ def games_to_target(
         "games_needed":    count,
         "final_rating":    round(r, 1),
         "rating_per_win":  round((r - current_rating) / count, 1) if count else 0,
-        "age":             age,
     }

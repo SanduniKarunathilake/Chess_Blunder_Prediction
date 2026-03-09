@@ -44,6 +44,7 @@ ENGINE_PATH = os.path.join(
 
 BLUNDER_THRESHOLD = 300   # centipawn loss threshold for blunder classification
 ENGINE_DEPTH      = 16    # Stockfish analysis depth (balance speed vs accuracy)
+MATE_PROXIMITY    = 5_000 # abs(eval) above this = already in near-forced-mate territory
 
 # Load blunder model once at startup
 try:
@@ -269,6 +270,7 @@ def parse_base_time(tc: str) -> float:
 # ---------------------------------------------------------------------------
 
 def get_k_factor(rating: float, games_played: int, age: int | None = None) -> int:
+    """K=40 if age<18 or games_played<30; K=20 if rating<2400; K=10 if >=2400."""
     if games_played < 30 or (age is not None and age < 18):
         return 40
     if rating < 2400:
@@ -297,17 +299,12 @@ def compute_rating_change(rating, opp_rating, outcome, games_played=30, age=None
     s = outcome_score(outcome)
     delta = round(k * (s - e), 1)
     new_r = round(rating + delta, 1)
-
     if k == 40:
-        if age is not None and age < 18:
-            k_reason = f"junior (age {age} < 18)"
-        else:
-            k_reason = f"provisional (games {games_played} < 30)"
+        reason = "Young player (age < 18)" if (age is not None and age < 18) else "New player (< 30 games)"
     elif k == 20:
-        k_reason = f"standard (rating {rating} < 2400)"
+        reason = "Standard player (rating < 2400)"
     else:
-        k_reason = f"elite (rating {rating} >= 2400)"
-
+        reason = "Elite player (rating \u2265 2400)"
     return {
         "old_rating":      rating,
         "new_rating":      new_r,
@@ -315,12 +312,11 @@ def compute_rating_change(rating, opp_rating, outcome, games_played=30, age=None
         "expected_score":  round(e, 4),
         "actual_score":    s,
         "k_factor":        k,
-        "k_reason":        k_reason,
+        "k_factor_reason": reason,
         "win_probability": round(e * 100, 1),
         "outcome":         outcome.lower(),
         "opponent_rating": opp_rating,
         "age":             age,
-        "games_played":    games_played,
     }
 
 
@@ -525,9 +521,20 @@ def api_predict_pgn():
 
             # Centipawn loss for the mover
             if white_moved:
-                cp_loss = eval_before_w - eval_after_w
+                raw_cp_loss = eval_before_w - eval_after_w
             else:
-                cp_loss = eval_after_w - eval_before_w
+                raw_cp_loss = eval_after_w - eval_before_w
+
+            # When the pre-move eval is already in a near-forced-mate zone the
+            # engine can "lose sight" of the mate on the very next ply and produce
+            # an artificially large cp_loss on an otherwise fine (or even winning)
+            # move.  Cap the loss so these depth-inconsistency artifacts are not
+            # reported as blunders.  The `near_mate` flag tells the UI why.
+            near_mate = abs(eval_before_w) >= MATE_PROXIMITY
+            if near_mate:
+                cp_loss = min(max(raw_cp_loss, 0), BLUNDER_THRESHOLD - 1)
+            else:
+                cp_loss = max(raw_cp_loss, 0)
 
             is_blunder = cp_loss >= BLUNDER_THRESHOLD
 
@@ -561,8 +568,9 @@ def api_predict_pgn():
                 "side":           side,
                 "eval_before":    eval_before_w,
                 "eval_after":     eval_after_w,
-                "cp_loss":        max(cp_loss, 0),
+                "cp_loss":        cp_loss,
                 "is_blunder":     is_blunder,
+                "near_mate":      near_mate,
                 "ml_risk":        ml_risk,
             })
 
@@ -601,8 +609,7 @@ def api_elo():
         "your_rating": 1500,
         "opponent_rating": 1600,
         "outcome": "win",           // "win" | "draw" | "loss"
-        "games_played": 30,         // optional, default 30
-        "age": 17                   // optional; under-18 forces K=40
+        "games_played": 30          // optional, default 30
     }
     """
     data = request.get_json(silent=True)
@@ -648,7 +655,6 @@ def api_elo_session():
     {
         "your_rating": 1500,
         "games_played": 30,
-        "age": 17,                  // optional; under-18 forces K=40
         "games": [
             {"opponent_rating": 1600, "outcome": "win",  "opponent_name": "Alice"},
             {"opponent_rating": 1450, "outcome": "loss", "opponent_name": "Bob"},
@@ -716,7 +722,6 @@ def api_elo_session():
         "starting_rating": your_rating,
         "final_rating":    current,
         "total_change":    round(current - your_rating, 1),
-        "age":             age,
         "summary":         {"wins": wins, "draws": draws, "losses": losses},
         "games":           results,
         "rating_history":  history,

@@ -32,14 +32,29 @@ function showAlert(id, msg) {
 function hideAlert(id) { hide(id); }
 
 async function apiCall(endpoint, body) {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
-    const data = await res.json();
+    let res;
+    try {
+        res = await fetch(`${API_BASE}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+    } catch (networkErr) {
+        throw { network: true, message: "Cannot connect to server. Make sure the backend is running on http://127.0.0.1:5000" };
+    }
+    let data;
+    try {
+        data = await res.json();
+    } catch {
+        throw { status: res.status, data: { error: `Server returned a non-JSON response (HTTP ${res.status}).` } };
+    }
     if (!res.ok) throw { status: res.status, data };
     return data;
+}
+
+function extractErrorMsg(err, fallback) {
+    if (err && err.network) return err.message;
+    return (err && err.data && (err.data.errors?.join(", ") || err.data.error)) || fallback;
 }
 
 // ── Tabs ─────────────────────────────────────────────────────
@@ -167,7 +182,7 @@ if (openingForm) {
             $("#opening-result").classList.add("visible");
 
         } catch (err) {
-            const msg = err.data?.errors?.join(", ") || err.data?.error || "Something went wrong.";
+            const msg = extractErrorMsg(err, "Something went wrong. Check the backend server.");
             showAlert("#opening-error", msg);
         } finally {
             btn.disabled = false;
@@ -243,7 +258,9 @@ if (pgnForm) {
             result.moves.forEach(m => {
                 const cpLoss = m.cp_loss;
                 let badge = "";
-                if (m.is_blunder)       badge = `<span class="blunder-badge high">BLUNDER (${cpLoss} cp)</span>`;
+                if (m.near_mate && !m.is_blunder)
+                                         badge = `<span class="blunder-badge low" title="Position already in forced-mate territory — cp loss capped to avoid depth-inconsistency false positives">Near Mate ♟</span>`;
+                else if (m.is_blunder)   badge = `<span class="blunder-badge high">BLUNDER (${cpLoss} cp)</span>`;
                 else if (cpLoss >= 100)  badge = `<span class="blunder-badge medium">Inaccuracy</span>`;
                 else                     badge = `<span class="blunder-badge low">OK</span>`;
 
@@ -271,7 +288,7 @@ if (pgnForm) {
             $("#pgn-result").classList.add("visible");
 
         } catch (err) {
-            const msg = err.data?.errors?.join(", ") || err.data?.error || "Failed to analyze PGN.";
+            const msg = extractErrorMsg(err, "Failed to analyze PGN. Check the backend server.");
             showAlert("#pgn-error", msg);
         } finally {
             btn.disabled = false;
@@ -305,16 +322,8 @@ if (eloForm) {
         const outcome         = validateRequired("outcome",   "Outcome");
         let   games_played    = parseInt($("#games_played")?.value || "30", 10);
         if (isNaN(games_played) || games_played < 0) games_played = 30;
-
         const ageRaw = $("#player_age")?.value?.trim();
-        let age = null;
-        if (ageRaw) {
-            age = parseInt(ageRaw, 10);
-            if (isNaN(age) || age < 5 || age > 120) {
-                setError("player_age", "Age must be between 5 and 120.");
-                return;
-            }
-        }
+        const age    = ageRaw ? parseInt(ageRaw, 10) : null;
 
         if (your_rating === null || opponent_rating === null || !outcome) return;
 
@@ -323,10 +332,9 @@ if (eloForm) {
         btn.innerHTML = '<span class="spinner"></span> Calculating…';
 
         try {
-            const r = await apiCall("/elo", {
-                your_rating, opponent_rating, outcome, games_played,
-                ...(age !== null ? { age } : {}),
-            });
+            const body = { your_rating, opponent_rating, outcome, games_played };
+            if (age !== null && !isNaN(age)) body.age = age;
+            const r = await apiCall("/elo", body);
 
             // Arrow
             const arrowEl = $("#elo-arrow");
@@ -346,18 +354,17 @@ if (eloForm) {
                 <div class="detail-item"><div class="dl">Outcome</div><div class="dv" style="text-transform:capitalize;">${r.outcome}</div></div>
                 <div class="detail-item"><div class="dl">Opponent</div><div class="dv">${r.opponent_rating}</div></div>
                 <div class="detail-item"><div class="dl">Win Probability</div><div class="dv">${r.win_probability}%</div></div>
-                <div class="detail-item"><div class="dl">K-Factor</div><div class="dv">${r.k_factor}</div></div>
-                <div class="detail-item"><div class="dl">K Reason</div><div class="dv" style="text-transform:capitalize;">${r.k_reason}</div></div>
+                <div class="detail-item"><div class="dl">K-Factor</div><div class="dv">${r.k_factor} <span style="font-size:.8em;opacity:.7;">(${r.k_factor_reason})</span></div></div>
                 <div class="detail-item"><div class="dl">Expected Score</div><div class="dv">${r.expected_score}</div></div>
                 <div class="detail-item"><div class="dl">Actual Score</div><div class="dv">${r.actual_score}</div></div>
-                ${r.age !== null && r.age !== undefined ? `<div class="detail-item"><div class="dl">Age</div><div class="dv">${r.age}</div></div>` : ""}
+                ${r.age != null ? `<div class="detail-item"><div class="dl">Age</div><div class="dv">${r.age}</div></div>` : ""}
             `;
 
             show("#elo-result");
             $("#elo-result").classList.add("visible");
 
         } catch (err) {
-            const msg = err.data?.errors?.join(", ") || err.data?.error || "Calculation failed.";
+            const msg = extractErrorMsg(err, "Calculation failed. Check the backend server.");
             showAlert("#elo-error", msg);
         } finally {
             btn.disabled = false;
@@ -444,16 +451,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let gp = parseInt($("#session_games_played")?.value || "30", 10);
         if (isNaN(gp) || gp < 0) gp = 30;
-
         const sessionAgeRaw = $("#session_age")?.value?.trim();
-        let sessionAge = null;
-        if (sessionAgeRaw) {
-            sessionAge = parseInt(sessionAgeRaw, 10);
-            if (isNaN(sessionAge) || sessionAge < 5 || sessionAge > 120) {
-                showAlert("#session-error", "Age must be between 5 and 120.");
-                return;
-            }
-        }
+        const sessionAge    = sessionAgeRaw ? parseInt(sessionAgeRaw, 10) : null;
 
         if (sessionGames.length === 0) {
             showAlert("#session-error", "Add at least one game first.");
@@ -465,12 +464,13 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.innerHTML = '<span class="spinner"></span> Calculating…';
 
         try {
-            const r = await apiCall("/elo/session", {
+            const body2 = {
                 your_rating: rating,
                 games_played: gp,
-                ...(sessionAge !== null ? { age: sessionAge } : {}),
                 games: sessionGames,
-            });
+            };
+            if (sessionAge !== null && !isNaN(sessionAge)) body2.age = sessionAge;
+            const r = await apiCall("/elo/session", body2);
 
             // Hero
             const hero = $("#session-hero");
@@ -496,6 +496,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="sg-num">#${g.game_number}</div>
                     <div>vs ${g.opponent_name} (${g.opponent_rating})</div>
                     <div class="sg-outcome ${oc}">${oc}</div>
+                    <div title="K=${g.k_factor}: ${g.k_factor_reason}" style="font-size:.8em;opacity:.7;">K=${g.k_factor}</div>
                     <div style="font-weight:700;color:${g.change >= 0 ? 'var(--green)' : 'var(--red)'}">${d}</div>
                 </div>`;
             }).join("");
@@ -504,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
             $("#session-result").classList.add("visible");
 
         } catch (err) {
-            const msg = err.data?.errors?.join(", ") || err.data?.error || "Session calculation failed.";
+            const msg = extractErrorMsg(err, "Session calculation failed. Check the backend server.");
             showAlert("#session-error", msg);
         } finally {
             btn.disabled = false;
